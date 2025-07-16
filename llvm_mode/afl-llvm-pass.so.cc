@@ -38,19 +38,26 @@
 #include <fstream>
 #include <sstream>
 #include <set>
+#include <map>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "llvm/ADT/Statistic.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/CFG.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-
+#include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
+#include "llvm/Pass.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Passes/OptimizationLevel.h"
 
 using namespace llvm;
 
@@ -63,23 +70,24 @@ std::map<std::string,std::pair<unsigned int,unsigned int>> dfg_node_map;
 
 namespace {
 
-  class AFLCoverage : public ModulePass {
-
+  class AFLCoverage : public PassInfoMixin<AFLCoverage> {
     public:
-
-      static char ID;
-      AFLCoverage() : ModulePass(ID) { }
-
-      bool runOnModule(Module &M) override;
-
-      // StringRef getPassName() const override {
-      //  return "American Fuzzy Lop Instrumentation";
-      // }
-
+      PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
   };
 
 }
 
+extern "C" LLVM_ATTRIBUTE_WEAK PassPluginLibraryInfo llvmGetPassPluginInfo() {
+  return {
+    LLVM_PLUGIN_API_VERSION, "AFLCoverage", "v0.1",
+    [](PassBuilder &PB) {
+      PB.registerOptimizerLastEPCallback(
+        [](ModulePassManager &MPM, OptimizationLevel OL) {
+            MPM.addPass(AFLCoverage());
+        });
+    }
+  };
+}
 
 void initCoverageTarget(char* select_file) {
   std::string line;
@@ -127,10 +135,7 @@ void initialize(void) {
 }
 
 
-char AFLCoverage::ID = 0;
-
-
-bool AFLCoverage::runOnModule(Module &M) {
+PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &AM) {
 
   LLVMContext &C = M.getContext();
 
@@ -248,20 +253,19 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       /* Load prev_loc */
 
-      LoadInst *PrevLoc = IRB.CreateLoad(AFLPrevLoc);
+      LoadInst *PrevLoc = IRB.CreateLoad(Int32Ty, AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
       Value *PrevLocCasted = IRB.CreateZExt(PrevLoc, IRB.getInt32Ty());
 
       /* Load SHM pointer */
 
-      LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
+      LoadInst *MapPtr = IRB.CreateLoad(PointerType::get(Int8Ty, 0), AFLMapPtr);
       MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-      Value *MapPtrIdx =
-          IRB.CreateGEP(MapPtr, IRB.CreateXor(PrevLocCasted, CurLoc));
+      Value *MapPtrIdx = IRB.CreateGEP(Int8Ty, MapPtr, IRB.CreateXor(PrevLocCasted, CurLoc));
 
       /* Update bitmap */
 
-      LoadInst *Counter = IRB.CreateLoad(MapPtrIdx);
+      LoadInst *Counter = IRB.CreateLoad(Int8Ty, MapPtrIdx);
       Counter->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
       Value *Incr = IRB.CreateAdd(Counter, ConstantInt::get(Int8Ty, 1));
       IRB.CreateStore(Incr, MapPtrIdx)
@@ -275,11 +279,11 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       if (is_dfg_node) {
         /* Update DFG coverage map. */
-        LoadInst *DFGMap = IRB.CreateLoad(AFLMapDFGPtr);
+        LoadInst *DFGMap = IRB.CreateLoad(PointerType::get(Int32Ty, 0), AFLMapDFGPtr);
         DFGMap->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         ConstantInt * Idx = ConstantInt::get(Int32Ty, node_idx);
         ConstantInt * Score = ConstantInt::get(Int32Ty, node_score);
-        Value *DFGMapPtrIdx = IRB.CreateGEP(DFGMap, Idx);
+        Value *DFGMapPtrIdx = IRB.CreateGEP(Int32Ty, DFGMap, Idx);
         IRB.CreateStore(Score, DFGMapPtrIdx)
             ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
       }
@@ -292,21 +296,6 @@ bool AFLCoverage::runOnModule(Module &M) {
   OKF("Selected blocks: %u, skipped blocks: %u. instrumented DFG nodes: %u",
       inst_blocks, skip_blocks, inst_dfg_nodes);
 
-  return true;
+  return PreservedAnalyses();
 
 }
-
-
-static void registerAFLPass(const PassManagerBuilder &,
-                            legacy::PassManagerBase &PM) {
-
-  PM.add(new AFLCoverage());
-
-}
-
-
-static RegisterStandardPasses RegisterAFLPass(
-    PassManagerBuilder::EP_ModuleOptimizerEarly, registerAFLPass);
-
-static RegisterStandardPasses RegisterAFLPass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerAFLPass);
