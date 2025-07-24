@@ -32,11 +32,25 @@ ifdef AFL_TRACE_PC
   CFLAGS    += -DUSE_TRACE_PC=1
 endif
 CFLAGS     += -fpermissive -w
+CFLAGS     += -lstdc++
+
+# For Dev
+# CFLAGS     += -fsanitize=address
 
 CXXFLAGS    ?= -O3 -funroll-loops
 CXXFLAGS    += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign \
                -DVERSION=\"$(VERSION)\" -Wno-variadic-macros
+ifdef AFL_TRACE_PC
+  CXXFLAGS  += -DUSE_TRACE_PC=1
+endif
 CXXFLAGS    += -fpermissive -w
+CXXFLAGS    += -std=c++17
+
+# For Dev
+# CXXFLAGS    += -fsanitize=address
+
+GPF_LDFLAGS  += -L/usr/local/lib/gpf
+GPF_LDFLAGS  += -lgpf-afl-put
 
 # Mark nodelete to work around unload bug in upstream LLVM 5.0+
 CLANG_CFL    = `$(LLVM_CONFIG) --cxxflags` -Wl,-znodelete -fno-rtti -fpic $(CXXFLAGS)
@@ -57,11 +71,7 @@ ifeq "$(origin CC)" "default"
   CXX        = clang++
 endif
 
-ifndef AFL_TRACE_PC
-  PROGS      = ../afl-clang-fast ../afl-llvm-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
-else
-  PROGS      = ../afl-clang-fast ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o
-endif
+PROGS = ../afl-clang-fast ../afl-llvm-pass.so ../afl-llvm-rt.o ../afl-llvm-rt-32.o ../afl-llvm-rt-64.o ../gpf-put-helper.o
 
 all: test_deps $(PROGS)
 
@@ -86,15 +96,18 @@ endif
 	$(CXX) $(CLANG_CFL) -shared $< -o $@ $(CLANG_LFL)
 
 ../afl-llvm-rt.o: afl-llvm-rt.o.c | test_deps
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+	$(CXX) $(CXXFLAGS) -fPIC $(GPF_LDFLAGS) -c $< -o $@
 
 ../afl-llvm-rt-32.o: afl-llvm-rt.o.c | test_deps
 	@printf "[*] Building 32-bit variant of the runtime (-m32)... "
-	@$(CC) $(CFLAGS) -m32 -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+	@$(CXX) $(CXXFLAGS) -m32 -fPIC $(GPF_LDFLAGS) -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
 
 ../afl-llvm-rt-64.o: afl-llvm-rt.o.c | test_deps
 	@printf "[*] Building 64-bit variant of the runtime (-m64)... "
-	@$(CC) $(CFLAGS) -m64 -fPIC -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+	@$(CXX) $(CXXFLAGS) -m64 -fPIC $(GPF_LDFLAGS) -c $< -o $@ 2>/dev/null; if [ "$$?" = "0" ]; then echo "success!"; else echo "failed (that's fine)"; fi
+
+../gpf-put-helper.o: gpf-put-helper.cpp | test_deps
+	$(CXX) $(CXXFLAGS) -fPIC $(GPF_LDFLAGS) -c $< -o $@
 
 test_build: $(PROGS)
 	@echo "[*] Testing the CC wrapper and instrumentation output..."

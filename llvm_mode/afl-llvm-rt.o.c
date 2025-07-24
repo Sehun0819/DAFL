@@ -30,6 +30,8 @@
 #include "../config.h"
 #include "../types.h"
 
+#include "gpf-put-helper.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -75,8 +77,8 @@ static u8 is_persistent;
 
 static void __afl_map_shm(void) {
 
-  u8 *id_str = getenv(SHM_ENV_VAR);
-  u8 *id_str_dfg = getenv(SHM_ENV_VAR_DFG);
+  u8 *id_str = (u8*)getenv(SHM_ENV_VAR);
+  u8 *id_str_dfg = (u8*)getenv(SHM_ENV_VAR_DFG);
 
   /* If we're running under AFL, attach to the appropriate region, replacing the
      early-stage __afl_area_initial region that is needed to allow some really
@@ -84,11 +86,11 @@ static void __afl_map_shm(void) {
 
   if (id_str) {
 
-    u32 shm_id = atoi(id_str);
-    u32 shm_id_dfg = atoi(id_str_dfg);
+    u32 shm_id = atoi((char*)id_str);
+    u32 shm_id_dfg = atoi((char*)id_str_dfg);
 
-    __afl_area_ptr = shmat(shm_id, NULL, 0);
-    __afl_area_dfg_ptr = shmat(shm_id_dfg, NULL, 0);
+    __afl_area_ptr = (u8*)shmat(shm_id, NULL, 0);
+    __afl_area_dfg_ptr = (u32*)shmat(shm_id_dfg, NULL, 0);
 
     /* Whooooops. */
 
@@ -242,21 +244,37 @@ int __afl_persistent_loop(unsigned int max_cnt) {
 
 }
 
+extern "C" void __gpf_manual_trace_on(void) {
+  static u8 init_done;
+
+  if (!init_done) {
+    gpf_handler::trace_on();
+    init_done = 1;
+  }
+}
+
+void __gpf_auto_trace_on(void) {
+  // if (getenv(GPF_DEFER_ENV_VAR)) return;
+  __gpf_manual_trace_on();
+}
 
 /* This one can be called from user code when deferred forkserver mode
     is enabled. */
 
-void __afl_manual_init(void) {
+extern "C" void __afl_manual_init(void) {
 
   static u8 init_done;
 
   if (!init_done) {
 
     __afl_map_shm();
+    gpf_handler::map_shm();
     __afl_start_forkserver();
     init_done = 1;
 
   }
+
+  __gpf_auto_trace_on();
 
 }
 
@@ -273,6 +291,7 @@ __attribute__((constructor(CONST_PRIO))) void __afl_auto_init(void) {
 
 }
 
+extern "C" {
 
 /* The following stuff deals with supporting -fsanitize-coverage=trace-pc-guard.
    It remains non-operational in the traditional, plugin-backed LLVM mode.
@@ -282,7 +301,10 @@ __attribute__((constructor(CONST_PRIO))) void __afl_auto_init(void) {
    edge (as opposed to every basic block). */
 
 void __sanitizer_cov_trace_pc_guard(uint32_t* guard) {
-  __afl_area_ptr[*guard]++;
+  if (!gpf::TPCAFLPUT().DoTrace()) return;
+
+  gpf::PCID pcid = *guard;
+  gpf::TPCAFLPUT().AppendPathLog(pcid);
 }
 
 
@@ -291,33 +313,7 @@ void __sanitizer_cov_trace_pc_guard(uint32_t* guard) {
    still touch the bitmap, but in a fairly harmless way. */
 
 void __sanitizer_cov_trace_pc_guard_init(uint32_t* start, uint32_t* stop) {
-
-  u32 inst_ratio = 100;
-  u8* x;
-
-  if (start == stop || *start) return;
-
-  x = getenv("AFL_INST_RATIO");
-  if (x) inst_ratio = atoi(x);
-
-  if (!inst_ratio || inst_ratio > 100) {
-    fprintf(stderr, "[-] ERROR: Invalid AFL_INST_RATIO (must be 1-100).\n");
-    abort();
-  }
-
-  /* Make sure that the first element in the range is always set - we use that
-     to avoid duplicate calls (which can happen as an artifact of the underlying
-     implementation in LLVM). */
-
-  *(start++) = R(MAP_SIZE - 1) + 1;
-
-  while (start < stop) {
-
-    if (R(100) < inst_ratio) *start = R(MAP_SIZE - 1) + 1;
-    else *start = 0;
-
-    start++;
-
-  }
-
+  gpf::TPCAFLPUT().HandleInit(start, stop);
 }
+
+} // extern "C"

@@ -35,10 +35,12 @@ int main(int argc, char** argv) {
     exit(1);
   }
 
-  if (buf[0] == '0')
+  if (buf[0] == '0') {
     printf("Looks like a zero to me!\n");
-  else
-    printf("A non-zero value? How quaint!\n");
+  } else {
+    printf("A non-zero value? ");
+    printf("How quaint!\n");
+  }
 
   exit(0);
 

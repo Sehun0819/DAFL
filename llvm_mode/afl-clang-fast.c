@@ -127,10 +127,13 @@ static void edit_params(u32 argc, char** argv) {
      http://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards */
 
 #ifdef USE_TRACE_PC
-  cc_params[cc_par_cnt++] = "-fsanitize-coverage=trace-pc-guard";
+  cc_params[cc_par_cnt++] = "-fsanitize-coverage=edge,no-prune,trace-pc-guard";
+  // cc_params[cc_par_cnt++] = "-fsanitize=external-fuzzer";
+  cc_params[cc_par_cnt++] = "-fexperimental-new-pass-manager";
+  cc_params[cc_par_cnt++] = alloc_printf("-fpass-plugin=%s/afl-llvm-pass.so", obj_path);
 #ifndef __ANDROID__
   cc_params[cc_par_cnt++] = "-mllvm";
-  cc_params[cc_par_cnt++] = "-sanitizer-coverage-block-threshold=0";
+  cc_params[cc_par_cnt++] = "-sanitizer-coverage-level=0";
 #endif
 #else
   cc_params[cc_par_cnt++] = "-fexperimental-new-pass-manager";
@@ -299,6 +302,11 @@ static void edit_params(u32 argc, char** argv) {
       break;
 
   }
+
+  cc_params[cc_par_cnt++] = "-lstdc++";
+  cc_params[cc_par_cnt++] = alloc_printf("%s/gpf-put-helper.o", obj_path);
+  cc_params[cc_par_cnt++] = alloc_printf("/usr/local/lib/gpf/libgpf-afl-put.so");
+
 #endif
 
   cc_params[cc_par_cnt] = NULL;
