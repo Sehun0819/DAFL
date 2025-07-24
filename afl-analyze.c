@@ -99,19 +99,23 @@ static volatile u8
 
 /* Classify tuple counts. This is a slow & naive version, but good enough here. */
 
-static u8 count_class_lookup[256] = {
-
-  [0]           = 0,
-  [1]           = 1,
-  [2]           = 2,
-  [3]           = 4,
-  [4 ... 7]     = 8,
-  [8 ... 15]    = 16,
-  [16 ... 31]   = 32,
-  [32 ... 127]  = 64,
-  [128 ... 255] = 128
-
-};
+static u8 count_class_lookup(int i) {
+  static u8 _count_class_lookup[256];
+  static int initialized = 0;
+  if (!initialized) {
+    _count_class_lookup[0] = 0;
+    _count_class_lookup[1] = 1;
+    _count_class_lookup[2] = 2;
+    _count_class_lookup[3] = 4;
+    memset(_count_class_lookup + 4, 8, 4);
+    memset(_count_class_lookup + 8, 16, 8);
+    memset(_count_class_lookup + 16, 32, 16);
+    memset(_count_class_lookup + 32, 64, 96);
+    memset(_count_class_lookup + 128, 128, 128);
+    initialized = 1;
+  }
+  return _count_class_lookup[i];
+}
 
 static void classify_counts(u8* mem) {
 
@@ -127,7 +131,7 @@ static void classify_counts(u8* mem) {
   } else {
 
     while (i--) {
-      *mem = count_class_lookup[*mem];
+      *mem = count_class_lookup(*mem);
       mem++;
     }
 
@@ -692,10 +696,10 @@ static void set_up_environment(void) {
 
   if (x) {
 
-    if (!strstr(x, "abort_on_error=1"))
+    if (!strstr((char*)x, "abort_on_error=1"))
       FATAL("Custom ASAN_OPTIONS set without abort_on_error=1 - please fix!");
 
-    if (!strstr(x, "symbolize=0"))
+    if (!strstr((char*)x, "symbolize=0"))
       FATAL("Custom ASAN_OPTIONS set without symbolize=0 - please fix!");
 
   }
@@ -704,11 +708,11 @@ static void set_up_environment(void) {
 
   if (x) {
 
-    if (!strstr(x, "exit_code=" STRINGIFY(MSAN_ERROR)))
+    if (!strstr((char*)x, "exit_code=" STRINGIFY(MSAN_ERROR)))
       FATAL("Custom MSAN_OPTIONS set without exit_code="
             STRINGIFY(MSAN_ERROR) " - please fix!");
 
-    if (!strstr(x, "symbolize=0"))
+    if (!strstr((char*)x, "symbolize=0"))
       FATAL("Custom MSAN_OPTIONS set without symbolize=0 - please fix!");
 
   }
@@ -838,7 +842,7 @@ static void find_binary(u8* fname) {
   u8* env_path = 0;
   struct stat st;
 
-  if (strchr(fname, '/') || !(env_path = getenv("PATH"))) {
+  if (strchr((char*)fname, '/') || !(env_path = getenv("PATH"))) {
 
     target_path = ck_strdup(fname);
 
@@ -850,7 +854,7 @@ static void find_binary(u8* fname) {
 
     while (env_path) {
 
-      u8 *cur_elem, *delim = strchr(env_path, ':');
+      u8 *cur_elem, *delim = strchr((char*)env_path, ':');
 
       if (delim) {
 
@@ -917,7 +921,7 @@ static char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
   }
 
   own_copy = ck_strdup(own_loc);
-  rsl = strrchr(own_copy, '/');
+  rsl = strrchr((char*)own_copy, '/');
 
   if (rsl) {
 

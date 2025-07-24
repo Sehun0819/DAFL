@@ -80,7 +80,7 @@ static void find_as(u8* argv0) {
 
   }
 
-  slash = strrchr(argv0, '/');
+  slash = strrchr((char*)argv0, '/');
 
   if (slash) {
 
@@ -208,7 +208,7 @@ static void edit_params(u32 argc, char** argv) {
     if (!strcmp(cur, "-fsanitize=address") ||
         !strcmp(cur, "-fsanitize=memory")) asan_set = 1;
 
-    if (strstr(cur, "FORTIFY_SOURCE")) fortify_set = 1;
+    if (strstr((char*)cur, "FORTIFY_SOURCE")) fortify_set = 1;
 
     cc_params[cc_par_cnt++] = cur;
 

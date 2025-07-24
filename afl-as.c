@@ -316,25 +316,25 @@ static void add_instrumentation(void) {
        encountered, we set skip_csect until the opposite directive is
        seen, and we do not instrument. */
 
-    if (strstr(line, ".code")) {
+    if (strstr((char*)line, ".code")) {
 
-      if (strstr(line, ".code32")) skip_csect = use_64bit;
-      if (strstr(line, ".code64")) skip_csect = !use_64bit;
+      if (strstr((char*)line, ".code32")) skip_csect = use_64bit;
+      if (strstr((char*)line, ".code64")) skip_csect = !use_64bit;
 
     }
 
     /* Detect syntax changes, as could happen with hand-written assembly.
        Skip Intel blocks, resume instrumentation when back to AT&T. */
 
-    if (strstr(line, ".intel_syntax")) skip_intel = 1;
-    if (strstr(line, ".att_syntax")) skip_intel = 0;
+    if (strstr((char*)line, ".intel_syntax")) skip_intel = 1;
+    if (strstr((char*)line, ".att_syntax")) skip_intel = 0;
 
     /* Detect and skip ad-hoc __asm__ blocks, likewise skipping them. */
 
     if (line[0] == '#' || line[1] == '#') {
 
-      if (strstr(line, "#APP")) skip_app = 1;
-      if (strstr(line, "#NO_APP")) skip_app = 0;
+      if (strstr((char*)line, "#APP")) skip_app = 1;
+      if (strstr((char*)line, "#NO_APP")) skip_app = 0;
 
     }
 
@@ -392,7 +392,7 @@ static void add_instrumentation(void) {
 
     /* Apple: L<whatever><digit>: */
 
-    if ((colon_pos = strstr(line, ":"))) {
+    if ((colon_pos = strstr((char*)line, ":"))) {
 
       if (line[0] == 'L' && isdigit(*(colon_pos - 1))) {
 
@@ -400,7 +400,7 @@ static void add_instrumentation(void) {
 
     /* Everybody else: .L<whatever>: */
 
-    if (strstr(line, ":")) {
+    if (strstr((char*)line, ":")) {
 
       if (line[0] == '.') {
 

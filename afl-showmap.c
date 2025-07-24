@@ -83,33 +83,41 @@ static volatile u8
 /* Classify tuple counts. Instead of mapping to individual bits, as in
    afl-fuzz.c, we map to more user-friendly numbers between 1 and 8. */
 
-static const u8 count_class_human[256] = {
+static const u8* count_class_human() {
+  static u8 _count_class_human[256];
+  static int initialized = 0;
+  if (!initialized) {
+    _count_class_human[0] = 0;
+    _count_class_human[1] = 1;
+    _count_class_human[2] = 2;
+    _count_class_human[3] = 3;
+    memset(_count_class_human + 4, 4, 4);
+    memset(_count_class_human + 8, 5, 8);
+    memset(_count_class_human + 16, 6, 16);
+    memset(_count_class_human + 32, 7, 96);
+    memset(_count_class_human + 128, 8, 128);
+    initialized = 1;
+  }
+  return _count_class_human;
+}
 
-  [0]           = 0,
-  [1]           = 1,
-  [2]           = 2,
-  [3]           = 3,
-  [4 ... 7]     = 4,
-  [8 ... 15]    = 5,
-  [16 ... 31]   = 6,
-  [32 ... 127]  = 7,
-  [128 ... 255] = 8
-
-};
-
-static const u8 count_class_binary[256] = {
-
-  [0]           = 0,
-  [1]           = 1,
-  [2]           = 2,
-  [3]           = 4,
-  [4 ... 7]     = 8,
-  [8 ... 15]    = 16,
-  [16 ... 31]   = 32,
-  [32 ... 127]  = 64,
-  [128 ... 255] = 128
-
-};
+static const u8* count_class_binary() {
+  static u8 _count_class_binary[256];
+  static int initialized = 0;
+  if (!initialized) {
+    _count_class_binary[0] = 0;
+    _count_class_binary[1] = 1;
+    _count_class_binary[2] = 2;
+    _count_class_binary[3] = 4;
+    memset(_count_class_binary + 4, 8, 4);
+    memset(_count_class_binary + 8, 16, 8);
+    memset(_count_class_binary + 16, 32, 16);
+    memset(_count_class_binary + 32, 64, 96);
+    memset(_count_class_binary + 128, 128, 128);
+    initialized = 1;
+  }
+  return _count_class_binary;
+}
 
 static void classify_counts(u8* mem, const u8* map) {
 
@@ -337,7 +345,7 @@ static void run_target(char** argv) {
     FATAL("Unable to execute '%s'", argv[0]);
 
   classify_counts(trace_bits, binary_mode ?
-                  count_class_binary : count_class_human);
+                  count_class_binary() : count_class_human());
 
   if (!quiet_mode)
     SAYF(cRST "-- Program output ends --\n");
@@ -514,7 +522,7 @@ static void find_binary(u8* fname) {
   u8* env_path = 0;
   struct stat st;
 
-  if (strchr(fname, '/') || !(env_path = getenv("PATH"))) {
+  if (strchr((char*)fname, '/') || !(env_path = getenv("PATH"))) {
 
     target_path = ck_strdup(fname);
 
@@ -526,7 +534,7 @@ static void find_binary(u8* fname) {
 
     while (env_path) {
 
-      u8 *cur_elem, *delim = strchr(env_path, ':');
+      u8 *cur_elem, *delim = strchr((char*)env_path, ':');
 
       if (delim) {
 
@@ -593,7 +601,7 @@ static char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
   }
 
   own_copy = ck_strdup(own_loc);
-  rsl = strrchr(own_copy, '/');
+  rsl = strrchr((char*)own_copy, '/');
 
   if (rsl) {
 

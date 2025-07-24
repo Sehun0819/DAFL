@@ -488,7 +488,7 @@ static void bind_to_free_cpu(void) {
       if (!strncmp(tmp, "VmSize:\t", 8)) has_vmsize = 1;
 
       if (!strncmp(tmp, "Cpus_allowed_list:\t", 19) &&
-          !strchr(tmp, '-') && !strchr(tmp, ',') &&
+          !strchr((char*)tmp, '-') && !strchr((char*)tmp, ',') &&
           sscanf(tmp + 19, "%u", &hval) == 1 && hval < sizeof(cpu_used) &&
           has_vmsize) {
 
@@ -727,7 +727,7 @@ static u8* DTD(u64 cur_ms, u64 event_ms) {
 
 static void mark_as_det_done(struct queue_entry* q) {
 
-  u8* fn = strrchr(q->fname, '/');
+  u8* fn = strrchr((char*)q->fname, '/');
   s32 fd;
 
   fn = alloc_printf("%s/queue/.state/deterministic_done/%s", out_dir, fn + 1);
@@ -748,7 +748,7 @@ static void mark_as_det_done(struct queue_entry* q) {
 
 static void mark_as_variable(struct queue_entry* q) {
 
-  u8 *fn = strrchr(q->fname, '/') + 1, *ldest;
+  u8 *fn = strrchr((char*)q->fname, '/') + 1, *ldest;
 
   ldest = alloc_printf("../../%s", fn);
   fn = alloc_printf("%s/queue/.state/variable_behavior/%s", out_dir, fn);
@@ -781,7 +781,7 @@ static void mark_as_redundant(struct queue_entry* q, u8 state) {
 
   q->fs_redundant = state;
 
-  fn = strrchr(q->fname, '/');
+  fn = strrchr((char*)q->fname, '/');
   fn = alloc_printf("%s/queue/.state/redundant_edges/%s", out_dir, fn + 1);
 
   if (state) {
@@ -1143,12 +1143,16 @@ static u64 compute_proximity_score(void) {
    is hit or not. Called on every new crash or timeout, should be
    reasonably fast. */
 
-static const u8 simplify_lookup[256] = {
-
-  [0]         = 1,
-  [1 ... 255] = 128
-
-};
+static u8 simplify_lookup(int i) {
+  static u8 _simplify_lookup[256];
+  static int initialized = 0;
+  if (!initialized) {
+    _simplify_lookup[0] = 1;
+    memset(_simplify_lookup + 1, 128, 255);
+    initialized = 1;
+  }
+  return _simplify_lookup[i];
+}
 
 #ifdef WORD_SIZE_64
 
@@ -1164,14 +1168,14 @@ static void simplify_trace(u64* mem) {
 
       u8* mem8 = (u8*)mem;
 
-      mem8[0] = simplify_lookup[mem8[0]];
-      mem8[1] = simplify_lookup[mem8[1]];
-      mem8[2] = simplify_lookup[mem8[2]];
-      mem8[3] = simplify_lookup[mem8[3]];
-      mem8[4] = simplify_lookup[mem8[4]];
-      mem8[5] = simplify_lookup[mem8[5]];
-      mem8[6] = simplify_lookup[mem8[6]];
-      mem8[7] = simplify_lookup[mem8[7]];
+      mem8[0] = simplify_lookup(mem8[0]);
+      mem8[1] = simplify_lookup(mem8[1]);
+      mem8[2] = simplify_lookup(mem8[2]);
+      mem8[3] = simplify_lookup(mem8[3]);
+      mem8[4] = simplify_lookup(mem8[4]);
+      mem8[5] = simplify_lookup(mem8[5]);
+      mem8[6] = simplify_lookup(mem8[6]);
+      mem8[7] = simplify_lookup(mem8[7]);
 
     } else *mem = 0x0101010101010101ULL;
 
@@ -1195,10 +1199,10 @@ static void simplify_trace(u32* mem) {
 
       u8* mem8 = (u8*)mem;
 
-      mem8[0] = simplify_lookup[mem8[0]];
-      mem8[1] = simplify_lookup[mem8[1]];
-      mem8[2] = simplify_lookup[mem8[2]];
-      mem8[3] = simplify_lookup[mem8[3]];
+      mem8[0] = simplify_lookup(mem8[0]);
+      mem8[1] = simplify_lookup(mem8[1]);
+      mem8[2] = simplify_lookup(mem8[2]);
+      mem8[3] = simplify_lookup(mem8[3]);
 
     } else *mem = 0x01010101;
 
@@ -1214,19 +1218,23 @@ static void simplify_trace(u32* mem) {
    preprocessing step for any newly acquired traces. Called on every exec,
    must be fast. */
 
-static const u8 count_class_lookup8[256] = {
-
-  [0]           = 0,
-  [1]           = 1,
-  [2]           = 2,
-  [3]           = 4,
-  [4 ... 7]     = 8,
-  [8 ... 15]    = 16,
-  [16 ... 31]   = 32,
-  [32 ... 127]  = 64,
-  [128 ... 255] = 128
-
-};
+static u8 count_class_lookup8(int i) {
+  static u8 _count_class_lookup8[256];
+  static int initialized = 0;
+  if (!initialized) {
+    _count_class_lookup8[0] = 0;
+    _count_class_lookup8[1] = 1;
+    _count_class_lookup8[2] = 2;
+    _count_class_lookup8[3] = 4;
+    memset(_count_class_lookup8 + 4, 8, 4);
+    memset(_count_class_lookup8 + 8, 16, 8);
+    memset(_count_class_lookup8 + 16, 32, 16);
+    memset(_count_class_lookup8 + 32, 64, 96);
+    memset(_count_class_lookup8 + 128, 128, 128);
+    initialized = 1;
+  }
+  return _count_class_lookup8[i];
+}
 
 static u16 count_class_lookup16[65536];
 
@@ -1238,8 +1246,8 @@ EXP_ST void init_count_class16(void) {
   for (b1 = 0; b1 < 256; b1++)
     for (b2 = 0; b2 < 256; b2++)
       count_class_lookup16[(b1 << 8) + b2] =
-        (count_class_lookup8[b1] << 8) |
-        count_class_lookup8[b2];
+        (count_class_lookup8(b1) << 8) |
+        count_class_lookup8(b2);
 
 }
 
@@ -1571,7 +1579,7 @@ static void read_testcases(void) {
 
     /* This also takes care of . and .. */
 
-    if (!S_ISREG(st.st_mode) || !st.st_size || strstr(fn, "/README.txt")) {
+    if (!S_ISREG(st.st_mode) || !st.st_size || strstr((char*)fn, "/README.txt")) {
 
       ck_free(fn);
       ck_free(dfn);
@@ -1736,8 +1744,8 @@ static void load_extras_file(u8* fname, u32* min_len, u32* max_len,
             FATAL("Invalid escaping (not \\xNN) in line %u.", cur_line);
 
           *(wptr++) =
-            ((strchr(hexdigits, tolower(lptr[1])) - hexdigits) << 4) |
-            (strchr(hexdigits, tolower(lptr[2])) - hexdigits);
+            ((strchr((char*)hexdigits, tolower(lptr[1])) - hexdigits) << 4) |
+            (strchr((char*)hexdigits, tolower(lptr[2])) - hexdigits);
 
           lptr += 3;
           klen++;
@@ -1782,7 +1790,7 @@ static void load_extras(u8* dir) {
 
   /* If the name ends with @, extract level and continue. */
 
-  if ((x = strchr(dir, '@'))) {
+  if ((x = strchr((char*)dir, '@'))) {
 
     *x = 0;
     dict_level = atoi(x + 1);
@@ -2845,7 +2853,7 @@ static void perform_dry_run(char** argv) {
     u8  res;
     s32 fd;
 
-    u8* fn = strrchr(q->fname, '/') + 1;
+    u8* fn = strrchr((char*)q->fname, '/') + 1;
 
     ACTF("Attempting dry run with '%s'...", fn);
 
@@ -3079,7 +3087,7 @@ static void pivot_inputs(void) {
 
   while (q) {
 
-    u8  *nfn, *rsl = strrchr(q->fname, '/');
+    u8  *nfn, *rsl = strrchr((char*)q->fname, '/');
     u32 orig_id;
 
     if (!rsl) rsl = q->fname; else rsl++;
@@ -3106,7 +3114,7 @@ static void pivot_inputs(void) {
       /* Since we're at it, let's also try to find parent and figure out the
          appropriate depth for this entry. */
 
-      src_str = strchr(rsl + 3, ':');
+      src_str = strchr((char*)rsl + 3, ':');
 
       if (src_str && sscanf(src_str + 1, "%06u", &src_id) == 1) {
 
@@ -3125,7 +3133,7 @@ static void pivot_inputs(void) {
 
 #ifndef SIMPLE_FILES
 
-      u8* use_name = strstr(rsl, ",orig:");
+      u8* use_name = strstr((char*)rsl, ",orig:");
 
       if (use_name) use_name += 6; else use_name = rsl;
       nfn = alloc_printf("%s/queue/id:%06u,orig:%s", out_dir, id, use_name);
@@ -3470,7 +3478,7 @@ static void find_timeout(void) {
   i = read(fd, tmp, sizeof(tmp) - 1); (void)i; /* Ignore errors */
   close(fd);
 
-  off = strstr(tmp, "exec_timeout      : ");
+  off = strstr((char*)tmp, "exec_timeout      : ");
   if (!off) return;
 
   ret = atoi(off + 20);
@@ -6989,7 +6997,7 @@ EXP_ST void check_binary(u8* fname) {
 
   ACTF("Validating target binary...");
 
-  if (strchr(fname, '/') || !(env_path = getenv("PATH"))) {
+  if (strchr((char*)fname, '/') || !(env_path = getenv("PATH"))) {
 
     target_path = ck_strdup(fname);
     if (stat(target_path, &st) || !S_ISREG(st.st_mode) ||
@@ -7000,7 +7008,7 @@ EXP_ST void check_binary(u8* fname) {
 
     while (env_path) {
 
-      u8 *cur_elem, *delim = strchr(env_path, ':');
+      u8 *cur_elem, *delim = strchr((char*)env_path, ':');
 
       if (delim) {
 
@@ -7035,8 +7043,8 @@ EXP_ST void check_binary(u8* fname) {
 
   /* Check for blatant user errors. */
 
-  if ((!strncmp(target_path, "/tmp/", 5) && !strchr(target_path + 5, '/')) ||
-      (!strncmp(target_path, "/var/tmp/", 9) && !strchr(target_path + 9, '/')))
+  if ((!strncmp(target_path, "/tmp/", 5) && !strchr((char*)target_path + 5, '/')) ||
+      (!strncmp(target_path, "/var/tmp/", 9) && !strchr((char*)target_path + 9, '/')))
      FATAL("Please don't keep binaries in /tmp or /var/tmp");
 
   fd = open(target_path, O_RDONLY);
@@ -7155,7 +7163,7 @@ static void fix_up_banner(u8* name) {
 
     } else {
 
-      u8* trim = strrchr(name, '/');
+      u8* trim = strrchr((char*)name, '/');
       if (!trim) use_banner = name; else use_banner = trim + 1;
 
     }
@@ -7659,10 +7667,10 @@ static void check_asan_opts(void) {
 
   if (x) {
 
-    if (!strstr(x, "abort_on_error=1"))
+    if (!strstr((char*)x, "abort_on_error=1"))
       FATAL("Custom ASAN_OPTIONS set without abort_on_error=1 - please fix!");
 
-    if (!strstr(x, "symbolize=0"))
+    if (!strstr((char*)x, "symbolize=0"))
       FATAL("Custom ASAN_OPTIONS set without symbolize=0 - please fix!");
 
   }
@@ -7671,11 +7679,11 @@ static void check_asan_opts(void) {
 
   if (x) {
 
-    if (!strstr(x, "exit_code=" STRINGIFY(MSAN_ERROR)))
+    if (!strstr((char*)x, "exit_code=" STRINGIFY(MSAN_ERROR)))
       FATAL("Custom MSAN_OPTIONS set without exit_code="
             STRINGIFY(MSAN_ERROR) " - please fix!");
 
-    if (!strstr(x, "symbolize=0"))
+    if (!strstr((char*)x, "symbolize=0"))
       FATAL("Custom MSAN_OPTIONS set without symbolize=0 - please fix!");
 
   }
@@ -7808,7 +7816,7 @@ static char** get_qemu_argv(u8* own_loc, char** argv, int argc) {
   }
 
   own_copy = ck_strdup(own_loc);
-  rsl = strrchr(own_copy, '/');
+  rsl = strrchr((char*)own_copy, '/');
 
   if (rsl) {
 
@@ -7926,7 +7934,7 @@ int main(int argc, char** argv) {
           if (sync_id) FATAL("Multiple -S or -M options not supported");
           sync_id = ck_strdup(optarg);
 
-          if ((c = strchr(sync_id, ':'))) {
+          if ((c = strchr((char*)sync_id, ':'))) {
 
             *c = 0;
 

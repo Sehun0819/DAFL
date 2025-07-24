@@ -31,10 +31,12 @@ CFLAGS      += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign \
 ifdef AFL_TRACE_PC
   CFLAGS    += -DUSE_TRACE_PC=1
 endif
+CFLAGS     += -fpermissive -w
 
 CXXFLAGS    ?= -O3 -funroll-loops
 CXXFLAGS    += -Wall -D_FORTIFY_SOURCE=2 -g -Wno-pointer-sign \
                -DVERSION=\"$(VERSION)\" -Wno-variadic-macros
+CXXFLAGS    += -fpermissive -w
 
 # Mark nodelete to work around unload bug in upstream LLVM 5.0+
 CLANG_CFL    = `$(LLVM_CONFIG) --cxxflags` -Wl,-znodelete -fno-rtti -fpic $(CXXFLAGS)
