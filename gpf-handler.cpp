@@ -10,6 +10,7 @@
 
 #include "alloc-inl.h"
 #include "debug.h"
+#include "gpf/call_graph.h"
 #include "gpf/trace_pc.h"
 #include "gpf/utils.h"
 
@@ -33,14 +34,26 @@ std::map<std::string, SHMEntry>& shm_table() {
   if (!initialized) {
     tbl.insert(
         {"__GPF_SHM_PATHLOG", SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
-    tbl.insert({"__GPF_SHM_PATHLOG_SIZE", SHMEntry(sizeof(u32))});
-    tbl.insert({"__GPF_SHM_NUM_GUARDS", SHMEntry(sizeof(u32))});
+    tbl.insert({"__GPF_SHM_PATHLOG_SIZE", SHMEntry(sizeof(size_t))});
+    tbl.insert({"__GPF_SHM_NUM_GUARDS", SHMEntry(sizeof(size_t))});
     tbl.insert({"__GPF_SHM_COVERED_BM_RAW",
                 SHMEntry(sizeof(u8) * PF_BITMAP_MAX_BYTE)});
     tbl.insert(
         {"__GPF_SHM_ND_BM_RAW", SHMEntry(sizeof(u8) * PF_BITMAP_MAX_BYTE)});
     tbl.insert(
         {"__GPF_SHM_PCID_TO_PC_RAW", SHMEntry(sizeof(void*) * PF_NUM_PC_MAX)});
+
+    tbl.insert(
+        {"__GPF_SHM_FUNC_ID_BM", SHMEntry(sizeof(u8) * PF_BITMAP_MAX_BYTE)});
+    tbl.insert({"__GPF_SHM_FUNC_ID_BM_SIZE", SHMEntry(sizeof(size_t))});
+    tbl.insert({"__GPF_SHM_COVERED_EDGES",
+                SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
+    tbl.insert({"__GPF_SHM_COVERED_EDGES_SIZE", SHMEntry(sizeof(size_t))});
+    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES",
+                SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
+    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE",
+                SHMEntry(sizeof(size_t))});
+
     initialized = true;
   }
   return tbl;
@@ -75,36 +88,26 @@ void setup_shm(void) {
 }
 
 void init() {
-  // gpf::start_time = std::chrono::steady_clock::now();
-
-  // gpf::verbose(gpf::VERBOSE_MID);
-
-  // gpf::register_byte_params(10);
-  // for (auto& byte_name : gpf::get_numeric_param_names())
-  //   gpf::register_sym_int_arg(byte_name);
-
-  // PathFinderInit();
-  // gpf::check_duet();
-  // PATHFINDER_CHECK(gpf::params_size() >= 1,
-  //                  "PathFinder Error: Arg size is not set up properly");
-  // gpf::NumericSolver solver;
-  // solver.set_condition({}, true);
-  // PATHFINDER_CHECK(
-  //     solver.is_satisfiable(),
-  //     "PathFinder Error: Provided initial constraint is not satisfiable");
-
-  // gpf::prepare_random_seed();
-  // gpf::prepare_corpus();
-
   gpf::TPCAFLMain().InitPathLogSHM(
       (gpf::PCID*)shm_table().at("__GPF_SHM_PATHLOG").addr,
       (size_t*)shm_table().at("__GPF_SHM_PATHLOG_SIZE").addr);
-
   gpf::TPCAFLMain().InitBitMapSHM(
       (size_t*)shm_table().at("__GPF_SHM_NUM_GUARDS").addr,
       (uint8_t*)shm_table().at("__GPF_SHM_COVERED_BM_RAW").addr,
       (uint8_t*)shm_table().at("__GPF_SHM_ND_BM_RAW").addr,
       (void**)shm_table().at("__GPF_SHM_PCID_TO_PC_RAW").addr);
+
+  gpf::CGAFLMain().init_shm_covered_edges(
+      (uint64_t*)shm_table().at("__GPF_SHM_COVERED_EDGES").addr,
+      (size_t*)shm_table().at("__GPF_SHM_COVERED_EDGES_SIZE").addr);
+  gpf::CGAFLMain().init_shm_newly_covered_indirect_edges(
+      (uint64_t*)shm_table().at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES").addr,
+      (size_t*)shm_table()
+          .at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE")
+          .addr);
+  gpf::CGAFLMain().init_shm_func_id_bm(
+      (uint8_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM").addr,
+      (size_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM_SIZE").addr);
 }
 
 }  // namespace gpf_handler

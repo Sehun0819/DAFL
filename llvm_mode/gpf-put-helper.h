@@ -1,3 +1,4 @@
+#include "gpf/call_graph.h"
 #include "gpf/trace_pc.h"
 
 namespace gpf_handler {

@@ -2678,6 +2678,7 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
 
   // memset(trace_bits, 0, MAP_SIZE);
   memset(dfg_bits, 0, sizeof(u32) * DFG_MAP_SIZE);
+  gpf::CGAFLMain().clear_trace();
   MEM_BARRIER();
 
   s32 res;
@@ -3194,9 +3195,9 @@ static void perform_dry_run(char** argv) {
 
         FATAL("Unable to execute target application ('%s')", argv[0]);
 
-      case FAULT_NOINST:
+      // case FAULT_NOINST:
 
-        FATAL("No instrumentation detected");
+      //   FATAL("No instrumentation detected");
 
       case FAULT_NOBITS:
 
@@ -8368,6 +8369,7 @@ int main(int argc, char** argv) {
   setup_post();
   setup_shm();
   gpf_handler::setup_shm();
+  gpf_handler::init();
   init_count_class16();
 
   setup_dirs_fds();
@@ -8404,21 +8406,34 @@ int main(int argc, char** argv) {
   write_stats_file(0, 0, 0);
   save_auto();
 
+  // if (getenv("CHECK_DISTANCE")) {
+  //   std::cout << "Check proximity of input `" << getenv("CHECK_DISTANCE") << "'." << std::endl;
+  //   fs::path source_file_path(getenv("CHECK_DISTANCE"));
+  //   std::string file_content = gpf::read_file(source_file_path);
+  //   write_to_testcase((void*)file_content.data(), file_content.size());
+  //   s32 run_status;
+  //   u64 prox;
+  //   std::tie(run_status, prox) =  dafl_run_target(exec_tmout);
+  //   std::cout << "Proximity: " << prox << std::endl;
+  //   exit(0);
+  // }
 
   /*******************/
   /* GPF Init */
   /*******************/
 
-  gpf_handler::init();
+  // init_forkserver(use_argv);
+
+  // gpf_handler::init();
   gpf::set_grammar(TARGET_LANG, CONFIG_PATH, TREE_SITTER_LANG);
   gpf::get_grammar().check();
   gpf::EngineDAFL pf_engine(write_to_testcase, dafl_run_target, exec_tmout,
                                   out_file, out_fd, std::chrono::steady_clock::now(),
                                   &gpf::TPCAFLMain());
   auto seed_file_paths = pf_engine.warmingup(std::string((char*)in_dir), 10);
-  std::map<size_t, std::string> pcid_to_pc = gpf::TPCAFLMain().pcid_to_pc();
-  std::vector<size_t> nd_pcids = gpf::TPCAFLMain().GetNDPCIDs();
-  std::cout << "# ND PCs: " << nd_pcids.size() << std::endl;
+  // std::map<size_t, std::string> pcid_to_pc = gpf::TPCAFLMain().pcid_to_pc();
+  // std::vector<size_t> nd_pcids = gpf::TPCAFLMain().GetNDPCIDs();
+  // std::cout << "# ND PCs: " << nd_pcids.size() << std::endl;
 
   pf_engine.parse_seeds(seed_file_paths);
 

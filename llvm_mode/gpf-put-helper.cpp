@@ -17,6 +17,14 @@ std::map<std::string, void*>& shm_table() {
     tbl.insert({"__GPF_SHM_COVERED_BM_RAW", nullptr});
     tbl.insert({"__GPF_SHM_ND_BM_RAW", nullptr});
     tbl.insert({"__GPF_SHM_PCID_TO_PC_RAW", nullptr});
+
+    tbl.insert({"__GPF_SHM_COVERED_EDGES", nullptr});
+    tbl.insert({"__GPF_SHM_COVERED_EDGES_SIZE", nullptr});
+    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES", nullptr});
+    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE", nullptr});
+    tbl.insert({"__GPF_SHM_FUNC_ID_BM", nullptr});
+    tbl.insert({"__GPF_SHM_FUNC_ID_BM_SIZE", nullptr});
+
     initialized = true;
   }
   return tbl;
@@ -41,12 +49,21 @@ void map_shm(void) {
     gpf::TPCAFLPUT().InitPathLogSHM(
         (gpf::PCID*)shm_table().at("__GPF_SHM_PATHLOG"),
         (size_t*)shm_table().at("__GPF_SHM_PATHLOG_SIZE"));
-
     gpf::TPCAFLPUT().InitBitMapSHM(
         (size_t*)shm_table().at("__GPF_SHM_NUM_GUARDS"),
         (uint8_t*)shm_table().at("__GPF_SHM_COVERED_BM_RAW"),
         (uint8_t*)shm_table().at("__GPF_SHM_ND_BM_RAW"),
         (void**)shm_table().at("__GPF_SHM_PCID_TO_PC_RAW"));
+
+    gpf::CGAFLPUT().init_shm_covered_edges(
+        (uint64_t*)shm_table().at("__GPF_SHM_COVERED_EDGES"),
+        (size_t*)shm_table().at("__GPF_SHM_COVERED_EDGES_SIZE"));
+    gpf::CGAFLPUT().init_shm_newly_covered_indirect_edges(
+        (uint64_t*)shm_table().at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES"),
+        (size_t*)shm_table().at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE"));
+    gpf::CGAFLPUT().init_shm_func_id_bm(
+        (uint8_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM"),
+        (size_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM_SIZE"));
   }
 }
 
