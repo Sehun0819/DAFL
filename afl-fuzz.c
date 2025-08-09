@@ -2678,7 +2678,6 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
 
   // memset(trace_bits, 0, MAP_SIZE);
   memset(dfg_bits, 0, sizeof(u32) * DFG_MAP_SIZE);
-  gpf::CGAFLMain().clear_trace();
   MEM_BARRIER();
 
   s32 res;

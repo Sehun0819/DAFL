@@ -10,7 +10,7 @@
 
 #include "alloc-inl.h"
 #include "debug.h"
-#include "gpf/call_graph.h"
+#include "gpf/cfg.h"
 #include "gpf/trace_pc.h"
 #include "gpf/utils.h"
 
@@ -28,6 +28,10 @@ struct SHMEntry {
   void* addr;
 };
 
+size_t n_bit_to_n_byte(size_t n_bit) {
+  return (n_bit / 8) + (n_bit % 8 == 0 ? 0 : 1);
+}
+
 std::map<std::string, SHMEntry>& shm_table() {
   static bool initialized = false;
   static std::map<std::string, SHMEntry> tbl;
@@ -43,16 +47,27 @@ std::map<std::string, SHMEntry>& shm_table() {
     tbl.insert(
         {"__GPF_SHM_PCID_TO_PC_RAW", SHMEntry(sizeof(void*) * PF_NUM_PC_MAX)});
 
+    tbl.insert({"__GPF_CFG_SHM_TRACE_TARGET_BM",
+                SHMEntry(sizeof(u8) *
+                         n_bit_to_n_byte(gpf::cfg_static_all().n_nodes()))});
     tbl.insert(
-        {"__GPF_SHM_FUNC_ID_BM", SHMEntry(sizeof(u8) * PF_BITMAP_MAX_BYTE)});
-    tbl.insert({"__GPF_SHM_FUNC_ID_BM_SIZE", SHMEntry(sizeof(size_t))});
-    tbl.insert({"__GPF_SHM_COVERED_EDGES",
+        {"__GPF_CFG_SHM_TRACE_TARGET_BM_SIZE", SHMEntry(sizeof(size_t))});
+    tbl.insert({"__GPF_CFG_SHM_REACHABILITY_BM",
+                SHMEntry(sizeof(u8) *
+                         n_bit_to_n_byte(gpf::cfg_static_all().n_nodes()))});
+    tbl.insert(
+        {"__GPF_CFG_SHM_REACHABILITY_BM_SIZE", SHMEntry(sizeof(size_t))});
+    tbl.insert({"__GPF_CFG_SHM_COVERED_EDGES",
                 SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
-    tbl.insert({"__GPF_SHM_COVERED_EDGES_SIZE", SHMEntry(sizeof(size_t))});
-    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES",
+    tbl.insert({"__GPF_CFG_SHM_COVERED_EDGES_SIZE", SHMEntry(sizeof(size_t))});
+
+    tbl.insert(
+        {"__GPF_CG_SHM_REACHABILITY_BM",
+         SHMEntry(sizeof(u8) * n_bit_to_n_byte(gpf::cg_static().n_nodes()))});
+    tbl.insert({"__GPF_CG_SHM_REACHABILITY_BM_SIZE", SHMEntry(sizeof(size_t))});
+    tbl.insert({"__GPF_CG_SHM_COVERED_EDGES",
                 SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
-    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE",
-                SHMEntry(sizeof(size_t))});
+    tbl.insert({"__GPF_CG_SHM_COVERED_EDGES_SIZE", SHMEntry(sizeof(size_t))});
 
     initialized = true;
   }
@@ -97,17 +112,36 @@ void init() {
       (uint8_t*)shm_table().at("__GPF_SHM_ND_BM_RAW").addr,
       (void**)shm_table().at("__GPF_SHM_PCID_TO_PC_RAW").addr);
 
-  gpf::CGAFLMain().init_shm_covered_edges(
-      (uint64_t*)shm_table().at("__GPF_SHM_COVERED_EDGES").addr,
-      (size_t*)shm_table().at("__GPF_SHM_COVERED_EDGES_SIZE").addr);
-  gpf::CGAFLMain().init_shm_newly_covered_indirect_edges(
-      (uint64_t*)shm_table().at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES").addr,
-      (size_t*)shm_table()
-          .at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE")
-          .addr);
-  gpf::CGAFLMain().init_shm_func_id_bm(
-      (uint8_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM").addr,
-      (size_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM_SIZE").addr);
+  gpf::TargetLoc target_loc = gpf::get_target_loc();
+
+  size_t* cfg_shm_trace_target_bm_size =
+      (size_t*)shm_table().at("__GPF_CFG_SHM_TRACE_TARGET_BM_SIZE").addr;
+  *cfg_shm_trace_target_bm_size = gpf::cfg_static_all().n_nodes();
+  size_t* cfg_shm_reachability_bm_size =
+      (size_t*)shm_table().at("__GPF_CFG_SHM_REACHABILITY_BM_SIZE").addr;
+  *cfg_shm_reachability_bm_size = gpf::cfg_static_all().n_nodes();
+  size_t* cg_shm_reachability_bm_size =
+      (size_t*)shm_table().at("__GPF_CG_SHM_REACHABILITY_BM_SIZE").addr;
+  *cg_shm_reachability_bm_size = gpf::cg_static().n_nodes();
+
+  auto cfg_shm = std::make_unique<gpf::IntraCFGSharedMemory>(
+      (uint8_t*)shm_table().at("__GPF_CFG_SHM_TRACE_TARGET_BM").addr,
+      *cfg_shm_trace_target_bm_size,
+      (uint8_t*)shm_table().at("__GPF_CFG_SHM_REACHABILITY_BM").addr,
+      *cfg_shm_reachability_bm_size,
+      (uint64_t*)shm_table().at("__GPF_CFG_SHM_COVERED_EDGES").addr,
+      (size_t*)shm_table().at("__GPF_CFG_SHM_COVERED_EDGES_SIZE").addr);
+
+  auto cg_shm = std::make_unique<gpf::CFGSharedMemory>(
+      (uint8_t*)shm_table().at("__GPF_CG_SHM_REACHABILITY_BM").addr,
+      *cg_shm_reachability_bm_size,
+      (uint64_t*)shm_table().at("__GPF_CG_SHM_COVERED_EDGES").addr,
+      (size_t*)shm_table().at("__GPF_CG_SHM_COVERED_EDGES_SIZE").addr);
+
+  gpf::set_cfg_analyzer(std::move(cfg_shm), gpf::cfg_static_all(),
+                        gpf::cfg_static_target(), target_loc.get_bb_ids());
+  gpf::set_cg_analyzer(std::move(cg_shm), gpf::cg_static(),
+                       target_loc.get_func_ids());
 }
 
 }  // namespace gpf_handler

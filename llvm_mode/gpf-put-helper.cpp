@@ -18,12 +18,17 @@ std::map<std::string, void*>& shm_table() {
     tbl.insert({"__GPF_SHM_ND_BM_RAW", nullptr});
     tbl.insert({"__GPF_SHM_PCID_TO_PC_RAW", nullptr});
 
-    tbl.insert({"__GPF_SHM_COVERED_EDGES", nullptr});
-    tbl.insert({"__GPF_SHM_COVERED_EDGES_SIZE", nullptr});
-    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES", nullptr});
-    tbl.insert({"__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE", nullptr});
-    tbl.insert({"__GPF_SHM_FUNC_ID_BM", nullptr});
-    tbl.insert({"__GPF_SHM_FUNC_ID_BM_SIZE", nullptr});
+    tbl.insert({"__GPF_CFG_SHM_TRACE_TARGET_BM", nullptr});
+    tbl.insert({"__GPF_CFG_SHM_TRACE_TARGET_BM_SIZE", nullptr});
+    tbl.insert({"__GPF_CFG_SHM_REACHABILITY_BM", nullptr});
+    tbl.insert({"__GPF_CFG_SHM_REACHABILITY_BM_SIZE", nullptr});
+    tbl.insert({"__GPF_CFG_SHM_COVERED_EDGES", nullptr});
+    tbl.insert({"__GPF_CFG_SHM_COVERED_EDGES_SIZE", nullptr});
+
+    tbl.insert({"__GPF_CG_SHM_REACHABILITY_BM", nullptr});
+    tbl.insert({"__GPF_CG_SHM_REACHABILITY_BM_SIZE", nullptr});
+    tbl.insert({"__GPF_CG_SHM_COVERED_EDGES", nullptr});
+    tbl.insert({"__GPF_CG_SHM_COVERED_EDGES_SIZE", nullptr});
 
     initialized = true;
   }
@@ -55,15 +60,29 @@ void map_shm(void) {
         (uint8_t*)shm_table().at("__GPF_SHM_ND_BM_RAW"),
         (void**)shm_table().at("__GPF_SHM_PCID_TO_PC_RAW"));
 
-    gpf::CGAFLPUT().init_shm_covered_edges(
-        (uint64_t*)shm_table().at("__GPF_SHM_COVERED_EDGES"),
-        (size_t*)shm_table().at("__GPF_SHM_COVERED_EDGES_SIZE"));
-    gpf::CGAFLPUT().init_shm_newly_covered_indirect_edges(
-        (uint64_t*)shm_table().at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES"),
-        (size_t*)shm_table().at("__GPF_SHM_NEWLY_COVERED_INDIRECT_EDGES_SIZE"));
-    gpf::CGAFLPUT().init_shm_func_id_bm(
-        (uint8_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM"),
-        (size_t*)shm_table().at("__GPF_SHM_FUNC_ID_BM_SIZE"));
+    size_t* cfg_shm_trace_target_bm_size =
+        (size_t*)shm_table().at("__GPF_CFG_SHM_TRACE_TARGET_BM_SIZE");
+    size_t* cfg_shm_reachability_bm_size =
+        (size_t*)shm_table().at("__GPF_CFG_SHM_REACHABILITY_BM_SIZE");
+    size_t* cg_shm_reachability_bm_size =
+        (size_t*)shm_table().at("__GPF_CG_SHM_REACHABILITY_BM_SIZE");
+
+    auto cfg_shm = std::make_unique<gpf::IntraCFGSharedMemory>(
+        (uint8_t*)shm_table().at("__GPF_CFG_SHM_TRACE_TARGET_BM"),
+        *cfg_shm_trace_target_bm_size,
+        (uint8_t*)shm_table().at("__GPF_CFG_SHM_REACHABILITY_BM"),
+        *cfg_shm_reachability_bm_size,
+        (uint64_t*)shm_table().at("__GPF_CFG_SHM_COVERED_EDGES"),
+        (size_t*)shm_table().at("__GPF_CFG_SHM_COVERED_EDGES_SIZE"));
+
+    auto cg_shm = std::make_unique<gpf::CFGSharedMemory>(
+        (uint8_t*)shm_table().at("__GPF_CG_SHM_REACHABILITY_BM"),
+        *cg_shm_reachability_bm_size,
+        (uint64_t*)shm_table().at("__GPF_CG_SHM_COVERED_EDGES"),
+        (size_t*)shm_table().at("__GPF_CG_SHM_COVERED_EDGES_SIZE"));
+
+    gpf::set_cfg_tracer(std::move(cfg_shm));
+    gpf::set_cg_tracer(std::move(cg_shm));
   }
 }
 
@@ -71,6 +90,9 @@ void trace_on(void) {
   if (launched_by_afl) {
     gpf::TPCAFLPUT().TraceOn();
     gpf::TPCAFLPUT().ClearPathLog();
+
+    gpf::cfg_tracer().clear_trace();
+    gpf::cg_tracer().clear_trace();
   }
 }
 
