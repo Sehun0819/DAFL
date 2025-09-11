@@ -8440,7 +8440,8 @@ int main(int argc, char** argv) {
 
   pf_engine.synthesize_edge_conditions();
 
-  pf_engine.apply_cond();
+  // pf_engine.apply_cond();
+  pf_engine.run();
 
   // pf_engine.prune_lexical_branches();
   // nd_pcids = gpf::TPCAFLMain().GetNDPCIDs();
