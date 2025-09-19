@@ -301,10 +301,7 @@ extern "C" {
    edge (as opposed to every basic block). */
 
 void __sanitizer_cov_trace_pc_guard(uint32_t* guard) {
-  if (!gpf::TPCAFLPUT().DoTrace()) return;
-
-  gpf::PCID pcid = *guard;
-  gpf::TPCAFLPUT().AppendPathLog(pcid);
+  assert(false);
 }
 
 
@@ -313,7 +310,7 @@ void __sanitizer_cov_trace_pc_guard(uint32_t* guard) {
    still touch the bitmap, but in a fairly harmless way. */
 
 void __sanitizer_cov_trace_pc_guard_init(uint32_t* start, uint32_t* stop) {
-  gpf::TPCAFLPUT().HandleInit(start, stop);
+  assert(false);
 }
 
 } // extern "C"

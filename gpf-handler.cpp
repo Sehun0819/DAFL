@@ -11,7 +11,6 @@
 #include "alloc-inl.h"
 #include "debug.h"
 #include "gpf/cfg.h"
-#include "gpf/trace_pc.h"
 #include "gpf/utils.h"
 
 namespace gpf_handler {
@@ -36,17 +35,6 @@ std::map<std::string, SHMEntry>& shm_table() {
   static bool initialized = false;
   static std::map<std::string, SHMEntry> tbl;
   if (!initialized) {
-    tbl.insert(
-        {"__GPF_SHM_PATHLOG", SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
-    tbl.insert({"__GPF_SHM_PATHLOG_SIZE", SHMEntry(sizeof(size_t))});
-    tbl.insert({"__GPF_SHM_NUM_GUARDS", SHMEntry(sizeof(size_t))});
-    tbl.insert({"__GPF_SHM_COVERED_BM_RAW",
-                SHMEntry(sizeof(u8) * PF_BITMAP_MAX_BYTE)});
-    tbl.insert(
-        {"__GPF_SHM_ND_BM_RAW", SHMEntry(sizeof(u8) * PF_BITMAP_MAX_BYTE)});
-    tbl.insert(
-        {"__GPF_SHM_PCID_TO_PC_RAW", SHMEntry(sizeof(void*) * PF_NUM_PC_MAX)});
-
     tbl.insert({"__GPF_CFG_SHM_TRACE_TARGET_BM",
                 SHMEntry(sizeof(u8) *
                          n_bit_to_n_byte(gpf::cfg_static_all().n_nodes()))});
@@ -58,7 +46,7 @@ std::map<std::string, SHMEntry>& shm_table() {
     tbl.insert(
         {"__GPF_CFG_SHM_REACHABILITY_BM_SIZE", SHMEntry(sizeof(size_t))});
     tbl.insert({"__GPF_CFG_SHM_COVERED_EDGES",
-                SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
+                SHMEntry(sizeof(u8) * GPF_TRACE_MAX_BYTE)});
     tbl.insert({"__GPF_CFG_SHM_COVERED_EDGES_SIZE", SHMEntry(sizeof(size_t))});
 
     tbl.insert(
@@ -66,7 +54,7 @@ std::map<std::string, SHMEntry>& shm_table() {
          SHMEntry(sizeof(u8) * n_bit_to_n_byte(gpf::cg_static().n_nodes()))});
     tbl.insert({"__GPF_CG_SHM_REACHABILITY_BM_SIZE", SHMEntry(sizeof(size_t))});
     tbl.insert({"__GPF_CG_SHM_COVERED_EDGES",
-                SHMEntry(sizeof(u8) * PF_EXECPATH_MAX_BYTE)});
+                SHMEntry(sizeof(u8) * GPF_TRACE_MAX_BYTE)});
     tbl.insert({"__GPF_CG_SHM_COVERED_EDGES_SIZE", SHMEntry(sizeof(size_t))});
 
     initialized = true;
@@ -103,15 +91,6 @@ void setup_shm(void) {
 }
 
 void init() {
-  gpf::TPCAFLMain().InitPathLogSHM(
-      (gpf::PCID*)shm_table().at("__GPF_SHM_PATHLOG").addr,
-      (size_t*)shm_table().at("__GPF_SHM_PATHLOG_SIZE").addr);
-  gpf::TPCAFLMain().InitBitMapSHM(
-      (size_t*)shm_table().at("__GPF_SHM_NUM_GUARDS").addr,
-      (uint8_t*)shm_table().at("__GPF_SHM_COVERED_BM_RAW").addr,
-      (uint8_t*)shm_table().at("__GPF_SHM_ND_BM_RAW").addr,
-      (void**)shm_table().at("__GPF_SHM_PCID_TO_PC_RAW").addr);
-
   gpf::TargetLoc target_loc = gpf::get_target_loc();
 
   size_t* cfg_shm_trace_target_bm_size =

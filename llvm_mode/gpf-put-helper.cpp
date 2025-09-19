@@ -11,13 +11,6 @@ std::map<std::string, void*>& shm_table() {
   static bool initialized = false;
   static std::map<std::string, void*> tbl;
   if (!initialized) {
-    tbl.insert({"__GPF_SHM_PATHLOG", nullptr});
-    tbl.insert({"__GPF_SHM_PATHLOG_SIZE", nullptr});
-    tbl.insert({"__GPF_SHM_NUM_GUARDS", nullptr});
-    tbl.insert({"__GPF_SHM_COVERED_BM_RAW", nullptr});
-    tbl.insert({"__GPF_SHM_ND_BM_RAW", nullptr});
-    tbl.insert({"__GPF_SHM_PCID_TO_PC_RAW", nullptr});
-
     tbl.insert({"__GPF_CFG_SHM_TRACE_TARGET_BM", nullptr});
     tbl.insert({"__GPF_CFG_SHM_TRACE_TARGET_BM_SIZE", nullptr});
     tbl.insert({"__GPF_CFG_SHM_REACHABILITY_BM", nullptr});
@@ -51,15 +44,6 @@ void map_shm(void) {
   }
 
   if (launched_by_afl) {
-    gpf::TPCAFLPUT().InitPathLogSHM(
-        (gpf::PCID*)shm_table().at("__GPF_SHM_PATHLOG"),
-        (size_t*)shm_table().at("__GPF_SHM_PATHLOG_SIZE"));
-    gpf::TPCAFLPUT().InitBitMapSHM(
-        (size_t*)shm_table().at("__GPF_SHM_NUM_GUARDS"),
-        (uint8_t*)shm_table().at("__GPF_SHM_COVERED_BM_RAW"),
-        (uint8_t*)shm_table().at("__GPF_SHM_ND_BM_RAW"),
-        (void**)shm_table().at("__GPF_SHM_PCID_TO_PC_RAW"));
-
     size_t* cfg_shm_trace_target_bm_size =
         (size_t*)shm_table().at("__GPF_CFG_SHM_TRACE_TARGET_BM_SIZE");
     size_t* cfg_shm_reachability_bm_size =
@@ -88,9 +72,6 @@ void map_shm(void) {
 
 void trace_on(void) {
   if (launched_by_afl) {
-    gpf::TPCAFLPUT().TraceOn();
-    gpf::TPCAFLPUT().ClearPathLog();
-
     gpf::cfg_tracer().clear_trace();
     gpf::cg_tracer().clear_trace();
   }

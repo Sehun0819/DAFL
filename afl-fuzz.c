@@ -2661,7 +2661,7 @@ static u8 run_target(char** argv, u32 timeout) {
 
 /* Run target callback which should be called during gpf::EngineAFL::run(). */
 
-static std::pair<s32, u64> dafl_run_target(u32 timeout) {
+s32 cb_run_target(u32 timeout) {
 
   static struct itimerval it;
   static u32 prev_timed_out = 0;
@@ -2687,14 +2687,14 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
 
   if ((res = write(fsrv_ctl_fd, &prev_timed_out, 4)) != 4) {
 
-    if (stop_soon) return std::make_pair(0, 0);
+    if (stop_soon) return 0;
     RPFATAL(res, "Unable to request new process from fork server (OOM?)");
 
   }
 
   if ((res = read(fsrv_st_fd, &child_pid, 4)) != 4) {
 
-    if (stop_soon) return std::make_pair(0, 0);
+    if (stop_soon) return 0;
     RPFATAL(res, "Unable to request new process from fork server (OOM?)");
 
   }
@@ -2713,7 +2713,7 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
 
   if ((res = read(fsrv_st_fd, &status, 4)) != 4) {
 
-    if (stop_soon) return std::make_pair(0, 0);
+    if (stop_soon) return 0;
     RPFATAL(res, "Unable to communicate with fork server (OOM?)");
 
   }
@@ -2746,8 +2746,6 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
 //   classify_counts((u32*)trace_bits);
 // #endif /* ^WORD_SIZE_64 */
 
-  u64 prox = compute_proximity_score();
-
   prev_timed_out = child_timed_out;
 
   /* Report outcome to caller. */
@@ -2757,10 +2755,10 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
     kill_signal = WTERMSIG(status);
 
     // if (child_timed_out && kill_signal == SIGKILL) return FAULT_TMOUT;
-    if (child_timed_out && kill_signal == SIGKILL) return std::make_pair(status, prox);
+    if (child_timed_out && kill_signal == SIGKILL) return status;
 
     // return FAULT_CRASH;
-    return std::make_pair(status, prox);
+    return status;
   }
 
   /* A somewhat nasty hack for MSAN, which doesn't support abort_on_error and
@@ -2769,12 +2767,12 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
   if (uses_asan && WEXITSTATUS(status) == MSAN_ERROR) {
     kill_signal = 0;
     // return FAULT_CRASH;
-    return std::make_pair(status, prox);
+    return status;
   }
 
   if ((dumb_mode == 1 || no_forkserver) && tb4 == EXEC_FAIL_SIG)
     // return FAULT_ERROR;
-    return std::make_pair(status, prox);
+    return status;
 
   /* It makes sense to account for the slowest units only if the testcase was run
   under the user defined timeout. */
@@ -2783,7 +2781,7 @@ static std::pair<s32, u64> dafl_run_target(u32 timeout) {
   }
 
   // return FAULT_NONE;
-  return std::make_pair(status, prox);
+  return status;
 
 }
 
@@ -8436,9 +8434,11 @@ int main(int argc, char** argv) {
   // gpf_handler::init();
   gpf::set_grammar(TARGET_LANG, CONFIG_PATH, TREE_SITTER_LANG);
   gpf::get_grammar().check();
-  gpf::EngineDAFL pf_engine(write_to_testcase, dafl_run_target, exec_tmout,
-                            out_file, out_fd, std::chrono::steady_clock::now(),
-                            &gpf::TPCAFLMain(), temperature, random_mutation_prob, shortening_cond_prob);
+  gpf::Engine pf_engine(std::chrono::steady_clock::now(),
+                        write_to_testcase,
+                        cb_run_target, exec_tmout,
+                        out_file, out_fd, 
+                        temperature, random_mutation_prob, shortening_cond_prob);
   auto seed_file_paths = pf_engine.warmingup(std::string((char*)in_dir), 10);
   // std::map<size_t, std::string> pcid_to_pc = gpf::TPCAFLMain().pcid_to_pc();
   // std::vector<size_t> nd_pcids = gpf::TPCAFLMain().GetNDPCIDs();
@@ -8446,14 +8446,13 @@ int main(int argc, char** argv) {
 
   pf_engine.parse_seeds(seed_file_paths);
 
-  pf_engine.mutate_subtrees_();
+  pf_engine.mutate_subtrees();
 
   pf_engine.synthesize_edge_conditions();
 
   // pf_engine.apply_cond();
   pf_engine.run();
 
-  // pf_engine.prune_lexical_branches();
   // nd_pcids = gpf::TPCAFLMain().GetNDPCIDs();
 
   // pf_engine.mutate_lexical();
