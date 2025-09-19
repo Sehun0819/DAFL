@@ -8423,12 +8423,22 @@ int main(int argc, char** argv) {
 
   // init_forkserver(use_argv);
 
+  double temperature = 1.0;
+  double random_mutation_prob = 0.2;
+  double shortening_cond_prob = 0.7;
+  if (getenv("TEMPERATURE"))
+    temperature = atof(getenv("TEMPERATURE"));
+  if (getenv("RAND_MUT_PROB"))
+    random_mutation_prob = atof(getenv("RAND_MUT_PROB"));
+  if (getenv("SHORT_COND_PROB"))
+    shortening_cond_prob = atof(getenv("SHORT_COND_PROB"));
+
   // gpf_handler::init();
   gpf::set_grammar(TARGET_LANG, CONFIG_PATH, TREE_SITTER_LANG);
   gpf::get_grammar().check();
   gpf::EngineDAFL pf_engine(write_to_testcase, dafl_run_target, exec_tmout,
-                                  out_file, out_fd, std::chrono::steady_clock::now(),
-                                  &gpf::TPCAFLMain());
+                            out_file, out_fd, std::chrono::steady_clock::now(),
+                            &gpf::TPCAFLMain(), temperature, random_mutation_prob, shortening_cond_prob);
   auto seed_file_paths = pf_engine.warmingup(std::string((char*)in_dir), 10);
   // std::map<size_t, std::string> pcid_to_pc = gpf::TPCAFLMain().pcid_to_pc();
   // std::vector<size_t> nd_pcids = gpf::TPCAFLMain().GetNDPCIDs();

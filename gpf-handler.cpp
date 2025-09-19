@@ -141,7 +141,7 @@ void init() {
   gpf::set_cfg_analyzer(std::move(cfg_shm), gpf::cfg_static_all(),
                         gpf::cfg_static_target(), target_loc.get_bb_ids());
   gpf::set_cg_analyzer(std::move(cg_shm), gpf::cg_static(),
-                       target_loc.get_func_ids());
+                       target_loc.get_points());
 }
 
 }  // namespace gpf_handler
