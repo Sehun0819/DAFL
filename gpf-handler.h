@@ -23,9 +23,6 @@ namespace gpf_handler {
 
 extern u64 total_execs;
 
-extern std::vector<std::string> tc_from_pf;
-extern std::vector<std::string> tc_to_pf;
-
 #define GPF_TERMINAL_SIZE 1 << 15
 extern char terminal[GPF_TERMINAL_SIZE];
 

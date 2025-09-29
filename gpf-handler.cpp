@@ -15,9 +15,6 @@
 
 namespace gpf_handler {
 
-std::vector<std::string> tc_from_pf;
-std::vector<std::string> tc_to_pf;
-
 char terminal[GPF_TERMINAL_SIZE];
 
 struct SHMEntry {

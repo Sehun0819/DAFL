@@ -879,9 +879,6 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det, u64 prox_score) {
 
   last_path_time = get_cur_time();
 
-  /* For being used by PathFinder  */
-  gpf_handler::tc_to_pf.push_back(std::string((char*)fname));
-
 }
 
 /* Sort the queue based on the proximity score. Needed after the dry-run. */
